@@ -69,9 +69,26 @@ public class FileTokenizer implements Runnable
     {
         CoreDocument document = pipeline.processToCoreDocument(text);
         ArrayList<String> results = new ArrayList<>();
+        Stemmer s = new Stemmer();
 
         for (CoreLabel tok : document.tokens()) {
-            results.add(tok.lemma());
+//            if(tok.lemma()==null)
+//            {
+//                results.add(tok.word());
+//            }
+//            else
+//            {
+//                results.add(tok.lemma());
+//            }
+
+            if(tok.lemma()==null)
+            {
+                results.add(s.stem(tok.word()));
+            }
+            else
+            {
+                results.add(s.stem(tok.lemma()));
+            }
         }
 
 //        ArrayList<String> results = new ArrayList();

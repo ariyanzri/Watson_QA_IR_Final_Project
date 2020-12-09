@@ -67,13 +67,30 @@ public class Indexer
     {
         CoreDocument document = pipeline.processToCoreDocument(text);
         ArrayList<String> results = new ArrayList<>();
+        Stemmer s = new Stemmer();
 
         for (CoreLabel tok : document.tokens())
         {
-            if (part_of_sp_consideration && !this.part_of_speech_is_valid(tok.tag()))
+            if (tok.tag() != null && part_of_sp_consideration && !this.part_of_speech_is_valid(tok.tag()))
                 continue;
 
-            results.add(tok.lemma());
+//            if(tok.lemma()==null)
+//            {
+//                results.add(tok.word());
+//            }
+//            else
+//            {
+//                results.add(tok.lemma());
+//            }
+
+            if(tok.lemma()==null)
+            {
+                results.add(s.stem(tok.word()));
+            }
+            else
+            {
+                results.add(s.stem(tok.lemma()));
+            }
         }
 
 //        ArrayList<String> results = new ArrayList();
