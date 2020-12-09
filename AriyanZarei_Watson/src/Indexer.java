@@ -17,6 +17,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.similarities.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -33,14 +34,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class Indexer {
+public class Indexer
+{
     private String path_to_wiki_files;
     private String path_to_tokenized_files;
     private String path_to_index;
     private Properties props;
     private StanfordCoreNLP pipeline;
 
-    public Indexer(String path, String token_path, String path_index) {
+    public Indexer(String path, String token_path, String path_index)
+    {
         path_to_wiki_files = path;
         path_to_tokenized_files = token_path;
         path_to_index = path_index;
@@ -49,12 +52,27 @@ public class Indexer {
         pipeline = new StanfordCoreNLP(props);
     }
 
-    private ArrayList<String> get_lemmatized_tokens(String text) {
-        CoreDocument document = pipeline.processToCoreDocument(text);
+    public boolean part_of_speech_is_valid(String tag)
+    {
+        if (tag.contains("IN") || tag.contains("CC") || tag.contains("UH"))
+        {
+            return false;
+        } else
+        {
+            return true;
+        }
+    }
 
+    public ArrayList<String> get_lemmatized_tokens(String text, boolean part_of_sp_consideration)
+    {
+        CoreDocument document = pipeline.processToCoreDocument(text);
         ArrayList<String> results = new ArrayList<>();
 
-        for (CoreLabel tok : document.tokens()) {
+        for (CoreLabel tok : document.tokens())
+        {
+            if (part_of_sp_consideration && !this.part_of_speech_is_valid(tok.tag()))
+                continue;
+
             results.add(tok.lemma());
         }
 
@@ -64,14 +82,17 @@ public class Indexer {
         return results;
     }
 
-    public void build_index_from_docs(Hashtable<String, ArrayList<String>> docs) {
-        try {
+    public void build_index_from_docs(Hashtable<String, ArrayList<String>> docs)
+    {
+        try
+        {
             Analyzer analyzer = new StandardAnalyzer();
             Directory directory = FSDirectory.open(Paths.get(path_to_index));
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             IndexWriter writer = new IndexWriter(directory, config);
 
-            for (String doc_id : docs.keySet()) {
+            for (String doc_id : docs.keySet())
+            {
                 String doc_content = String.join(" ", docs.get(doc_id));
 
                 Document doc = new Document();
@@ -83,15 +104,19 @@ public class Indexer {
 
             writer.close();
 
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
 
-    public ArrayList<String> search_query(String query) {
-        ArrayList<String> hit_doc_ids = new ArrayList<>();
+    public Hashtable<String, Float> search_query(String query)
+    {
 
-        try {
+        Hashtable<String, Float> hit_doc_ids = new Hashtable<>();
+
+        try
+        {
             Analyzer analyzer = new StandardAnalyzer();
             Directory directory = FSDirectory.open(Paths.get(path_to_index));
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
@@ -101,47 +126,157 @@ public class Indexer {
 
             IndexSearcher searcher = new IndexSearcher(reader);
 
-            ArrayList<String> query_tokens = this.get_lemmatized_tokens(query);
+            ArrayList<String> query_tokens = this.get_lemmatized_tokens(query, true);
 
             String querystr = String.join(" ", query_tokens);
 
             Query q = null;
 
-            q = new QueryParser("lematized_tokens", analyzer).parse(querystr);
-
+            q = new QueryParser("lematized_tokens", analyzer).parse(QueryParser.escape(querystr));
             int hitsPerPage = 10;
 
             TopDocs docs = searcher.search(q, hitsPerPage);
             ScoreDoc[] hits = docs.scoreDocs;
 
-            for (int i = 0; i < hits.length; ++i) {
+            for (int i = 0; i < hits.length; ++i)
+            {
                 int docId = hits[i].doc;
+
                 Document d = searcher.doc(docId);
-                hit_doc_ids.add(d.get("doc_id"));
+                hit_doc_ids.put(d.get("doc_id"), hits[i].score);
             }
 
             reader.close();
             writer.close();
             directory.close();
 
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
-        } catch (ParseException e) {
+        } catch (ParseException e)
+        {
             e.printStackTrace();
         }
 
         return hit_doc_ids;
     }
 
-    public void build_index_from_wikipedia() {
+    public Hashtable<String, Float> search_query_new_scoring_func(String query)
+    {
+
+        Hashtable<String, Float> hit_doc_ids = new Hashtable<>();
+
+        try
+        {
+            Analyzer analyzer = new StandardAnalyzer();
+            Directory directory = FSDirectory.open(Paths.get(path_to_index));
+            IndexWriterConfig config = new IndexWriterConfig(analyzer);
+            IndexWriter writer = new IndexWriter(directory, config);
+
+            DirectoryReader reader = DirectoryReader.open(writer);
+
+            IndexSearcher searcher = new IndexSearcher(reader);
+            Similarity similarity = new BM25Similarity();
+            searcher.setSimilarity(similarity);
+
+            ArrayList<String> query_tokens = this.get_lemmatized_tokens(query, true);
+
+            String querystr = String.join(" ", query_tokens);
+
+            Query q = null;
+
+            q = new QueryParser("lematized_tokens", analyzer).parse(QueryParser.escape(querystr));
+            int hitsPerPage = 10;
+
+            TopDocs docs = searcher.search(q, hitsPerPage);
+            ScoreDoc[] hits = docs.scoreDocs;
+
+            for (int i = 0; i < hits.length; ++i)
+            {
+                int docId = hits[i].doc;
+
+                Document d = searcher.doc(docId);
+                hit_doc_ids.put(d.get("doc_id"), hits[i].score);
+            }
+
+            reader.close();
+            writer.close();
+            directory.close();
+
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+        } catch (ParseException e)
+        {
+            e.printStackTrace();
+        }
+
+        return hit_doc_ids;
+    }
+
+    public String find_most_relevant(String query)
+    {
+        Hashtable<String, Float> results = this.search_query(query);
+//        Hashtable<String, Float> results = this.search_query_new_scoring_func(query);
+
+        float max_score = (float) -1;
+        String most_relevant_doc = "";
+
+        for (String key : results.keySet())
+        {
+            float sc = results.get(key);
+            if (sc > max_score)
+            {
+                most_relevant_doc = key;
+                max_score = sc;
+            }
+        }
+
+        return most_relevant_doc;
+    }
+
+    public ArrayList<String> find_top_k_relevant(String query,int k)
+    {
+        ArrayList<String> top_k = new ArrayList<>();
+        Hashtable<String, Float> results = this.search_query(query);
+//        Hashtable<String, Float> results = this.search_query_new_scoring_func(query);
+
+        while (top_k.size()<k && results.size()>0)
+        {
+            float max_score = (float) -1;
+            String most_relevant_doc = "";
+
+            for (String key : results.keySet())
+            {
+                float sc = results.get(key);
+                if (sc > max_score)
+                {
+                    most_relevant_doc = key;
+                    max_score = sc;
+                }
+            }
+
+            if(!most_relevant_doc.isEmpty())
+            {
+                top_k.add(most_relevant_doc);
+            }
+        }
+
+        return top_k;
+    }
+
+    public void build_index_from_wikipedia()
+    {
         File path_files = new File(path_to_wiki_files);
         Hashtable<String, ArrayList<String>> docs = new Hashtable<>();
 
         ArrayList<Runnable> tokenizers = new ArrayList<>();
 
-        try {
+        try
+        {
 
-            for (String s : path_files.list()) {
+            for (String s : path_files.list())
+            {
                 File f = new File(path_files, s);
 
                 File path_tokenized_files = new File(path_to_tokenized_files);
@@ -152,25 +287,30 @@ public class Indexer {
             }
             System.out.println(tokenizers.size());
             ExecutorService pool = Executors.newFixedThreadPool(4);
-            for (Runnable t : tokenizers) {
+            for (Runnable t : tokenizers)
+            {
                 pool.execute(t);
             }
 
             pool.shutdown();
             pool.awaitTermination(Long.MAX_VALUE, TimeUnit.MINUTES);
 
-
-            for (Runnable t : tokenizers) {
+            int i = 0;
+            for (Runnable t : tokenizers)
+            {
                 FileTokenizer ft = (FileTokenizer) t;
                 Hashtable<String, ArrayList<String>> d = ft.read_from_file();
-                for (String k : d.keySet()) {
-                    docs.put(k, d.get(k));
-                }
+
+                build_index_from_docs(d);
+                System.out.println("index for file " + i + " has been added.");
+                i += 1;
             }
 
-            build_index_from_docs(docs);
+            System.out.println("Done Reading the docs.");
 
-        } catch (Exception e) {
+
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
 
