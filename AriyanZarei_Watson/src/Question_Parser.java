@@ -59,7 +59,11 @@ public class Question_Parser
         for (Question q : questions)
         {
             ArrayList<String> tokens = indexer.get_lemmatized_tokens(q.clue+" "+q.category,true);
-            String doc_id = indexer.find_most_relevant(String.join(" ", tokens));
+//            String query = String.join(" ", tokens);
+            String query = "\""+String.join(" ", tokens)+"\"~"+((int)tokens.size());
+
+            String doc_id = indexer.find_most_relevant(query);
+
             String answers = String.join(",", q.answers);
             String r;
             if (answers.contains(doc_id))
@@ -70,10 +74,13 @@ public class Question_Parser
             {
                 r = "INCORRECT ";
             }
-
-            System.out.println(r + "Ground Truth: " + answers + " - Watson result: " + doc_id);
+            System.out.println("--------------------------------------------------------------");
+            System.out.println("Clue: "+q.clue);
+            System.out.println("\tAnswers: "+answers);
+            System.out.println("\tWatson result: "+doc_id);
+            System.out.println("\t"+r);
         }
-        System.out.println("Accuracy: "+acc/100.0);
+        System.out.println("P@1: "+acc/100.0);
     }
 
     public void search_all_questions_top_k(int k)

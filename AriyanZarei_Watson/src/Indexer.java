@@ -74,23 +74,23 @@ public class Indexer
             if (tok.tag() != null && part_of_sp_consideration && !this.part_of_speech_is_valid(tok.tag()))
                 continue;
 
-//            if(tok.lemma()==null)
-//            {
-//                results.add(tok.word());
-//            }
-//            else
-//            {
-//                results.add(tok.lemma());
-//            }
-
             if(tok.lemma()==null)
             {
-                results.add(s.stem(tok.word()));
+                results.add(tok.word());
             }
             else
             {
-                results.add(s.stem(tok.lemma()));
+                results.add(tok.lemma());
             }
+
+//            if(tok.lemma()==null)
+//            {
+//                results.add(s.stem(tok.word()));
+//            }
+//            else
+//            {
+//                results.add(s.stem(tok.lemma()));
+//            }
         }
 
 //        ArrayList<String> results = new ArrayList();

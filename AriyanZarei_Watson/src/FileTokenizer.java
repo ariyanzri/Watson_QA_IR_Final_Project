@@ -72,23 +72,23 @@ public class FileTokenizer implements Runnable
         Stemmer s = new Stemmer();
 
         for (CoreLabel tok : document.tokens()) {
-//            if(tok.lemma()==null)
-//            {
-//                results.add(tok.word());
-//            }
-//            else
-//            {
-//                results.add(tok.lemma());
-//            }
-
             if(tok.lemma()==null)
             {
-                results.add(s.stem(tok.word()));
+                results.add(tok.word());
             }
             else
             {
-                results.add(s.stem(tok.lemma()));
+                results.add(tok.lemma());
             }
+
+//            if(tok.lemma()==null)
+//            {
+//                results.add(s.stem(tok.word()));
+//            }
+//            else
+//            {
+//                results.add(s.stem(tok.lemma()));
+//            }
         }
 
 //        ArrayList<String> results = new ArrayList();
